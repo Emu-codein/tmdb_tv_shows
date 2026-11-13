@@ -6,8 +6,8 @@ What makes a TV series popular, and how could popularity be predicted before a s
 
 Work in progress.
 
-- **Done:** cleaning of the full dataset (`src/tmdb_tv_shows/clean.py`), including repeated IDs, zero placeholders and flags. Netflix shows are marked, not yet analysed.
-- **Next:** EDA and the popularity insights.
+- **Done:** cleaning of the full dataset (`src/tmdb_tv_shows/clean.py`), including repeated IDs, zero placeholders and flags, and Netflix shows marked (2,031). Data quality checks on the Netflix subset are done (see `notebooks/eda.ipynb`).
+- **Next:** patterns and relationships in the EDA, then the popularity insights.
 - **Later:** an outline of the ML approach for predicting popularity before launch. No model is trained yet.
 
 ## Data
@@ -57,12 +57,15 @@ pyproject.toml, uv.lock      dependencies, pinned
 - Blank text becomes missing, exact duplicate rows are dropped, names are normalised into `name_clean`, list columns (genres, networks, creators and so on) are split into `_list` columns, and dates are converted to datetime.
 - **Zero placeholders:** `episode_run_time` 0 becomes missing. `number_of_seasons` and `number_of_episodes` 0 become missing unless the show is Planned or In Production. `vote_average` is missing where there are no votes. `popularity` 0 is kept, it looks like a real floor.
 - **Repeated IDs:** one row per show. A copy that lists Netflix is preferred. Then the latest `last_air_date` and the most complete row, in an order that depends on whether `first_air_date` differs between copies. Where only `popularity` differs, it becomes the median of the copies, and the original stays in `popularity_raw`.
+- **Netflix label:** `is_netflix` is True if "netflix" is one of the `networks` (`netflix_network`, 1,929 shows) or the `homepage` is on netflix.com (`netflix_homepage`). Together that is 2,031 shows, 102 of them by homepage only. `networks` itself is never changed.
 - **Flags, not fixes:** `dates_reversed` (last air date before first air date) and `votes_inconsistent` (0 votes but an average above 0).
 
 ## Known limits
 
-- The dataset is a snapshot from around spring 2024, inferred from the latest dates and not documented. It covers all networks. Netflix shows are selected through the `networks` field, which may record the original network, not where a show can be watched.
-- Shows with a blank `networks` can never match Netflix, so some may be missing.
+- The dataset is a snapshot from around spring 2024, inferred from the latest dates and not documented. It covers all networks.
+- TMDB's guidelines say `networks` typically lists only the first network to air a show, so licensed shows (for example Friends on NBC) list their original network. The netflix.com homepage rule adds shows that are on Netflix but not listed. It shows a show is on Netflix, which may not mean Netflix aired it first.
+- Some Netflix shows may still be missing, if they have neither Netflix in `networks` nor a netflix.com homepage.
+- Netflix is hard-coded in the cleaning (the label and the keep-one-row rule). Next time the cleaning should treat every network the same way.
 - Copies of one show differ in `popularity`, probably from snapshots taken at different times. This is assumed, there is no timestamp column. One popularity reading is noisy, and the median is only used where nothing else differs.
 - Left for EDA: the `popularity` floor at 0, outliers in `episode_run_time`, noisy `vote_average` for shows with few votes, and future start dates (32 rows after June 2024).
 - One known duplicate show under two IDs (The Lørenskog Disappearance) is not removed, because a fix for one ID would not scale.

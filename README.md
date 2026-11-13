@@ -6,16 +6,16 @@ What makes a TV series popular, and how could popularity be predicted before a s
 
 Work in progress.
 
-- **Done:** loading, cleaning and formatting the full dataset, then filtering to Netflix.
-- **Next:** repeated IDs, zero placeholders and outliers, then EDA and the popularity insights.
+- **Done:** cleaning of the full dataset (`src/tmdb_tv_shows/clean.py`), including repeated IDs, zero placeholders and flags. Netflix shows are marked, not yet analysed.
+- **Next:** EDA and the popularity insights.
 - **Later:** an outline of the ML approach for predicting popularity before launch. No model is trained yet.
 
 ## Data
 
 - Source: [TMDB TV shows dataset on Kaggle](https://www.kaggle.com/datasets/asaniczka/full-tmdb-tv-shows-dataset-2023-150k-shows) (`TMDB_tv_dataset_v3.csv`).
-- About 168,000 rows and 29 columns, one row per show. It covers all networks, not only Netflix.
+- 168,639 rows and 29 columns. It covers all networks, not only Netflix.
 - The file is not in the repo. Download it and put it at `data/tmdb_tv_shows/TMDB_tv_dataset_v3.csv`. The `data/` folder is git-ignored.
-- `popularity` is TMDB's own score. There is no views or hours-watched column.
+- There is no views or hours-watched column. `popularity` is TMDB's own score, and `vote_count` and `vote_average` come from TMDB user ratings.
 
 ## Setup
 
@@ -27,22 +27,42 @@ uv sync
 
 Then open `notebooks/tmdb.ipynb` and select the `.venv` kernel.
 
+## Use the cleaning code
+
+```python
+from tmdb_tv_shows.clean import build
+
+raw, clean, dedup, dropped = build()
+netflix = dedup[dedup.is_netflix]
+```
+
+- `raw`: the file as read, never changed.
+- `clean`: all cleaning applied, repeated IDs still present (167,059 rows).
+- `dedup`: one row per show (164,705 rows). Use this for analysis.
+- `dropped`: the 2,354 copies not kept, so nothing is lost.
+
+If you edit `clean.py` in a running notebook, restart the kernel or use `%autoreload 2`.
+
 ## Project layout
 
 ```
-notebooks/tmdb.ipynb     cleaning and exploration
-src/tmdb_tv_shows/       package (cleaning code will move here)
-data/                    dataset, not tracked
-pyproject.toml, uv.lock  dependencies, pinned
+src/tmdb_tv_shows/clean.py   cleaning pipeline (load, clean, flag Netflix, one row per id)
+notebooks/tmdb.ipynb         exploration and notes
+data/                        dataset, not tracked
+pyproject.toml, uv.lock      dependencies, pinned
 ```
 
-## What the notebook does so far
+## What the cleaning does
 
-- Loads the raw file and never changes it.
-- Cleans a copy: blank text to missing, exact duplicate rows dropped, a normalised `name_clean`, list columns (genres, networks, creators and so on) split into lists, dates converted to datetime.
-- Filters the cleaned data to Netflix shows (1,957 rows, 1,929 distinct shows).
+- Blank text becomes missing, exact duplicate rows are dropped, names are normalised into `name_clean`, list columns (genres, networks, creators and so on) are split into `_list` columns, and dates are converted to datetime.
+- **Zero placeholders:** `episode_run_time` 0 becomes missing. `number_of_seasons` and `number_of_episodes` 0 become missing unless the show is Planned or In Production. `vote_average` is missing where there are no votes. `popularity` 0 is kept, it looks like a real floor.
+- **Repeated IDs:** one row per show. A copy that lists Netflix is preferred. Then the latest `last_air_date` and the most complete row, in an order that depends on whether `first_air_date` differs between copies. Where only `popularity` differs, it becomes the median of the copies, and the original stays in `popularity_raw`.
+- **Flags, not fixes:** `dates_reversed` (last air date before first air date) and `votes_inconsistent` (0 votes but an average above 0).
 
 ## Known limits
 
-- The dataset is a snapshot from around spring 2024 and covers all networks. Netflix shows are selected through the `networks` field, which may record the original network, not where a show can be watched.
-- Some shows appear several times with different values (for example `popularity`). These repeated IDs are not resolved yet.
+- The dataset is a snapshot from around spring 2024, inferred from the latest dates and not documented. It covers all networks. Netflix shows are selected through the `networks` field, which may record the original network, not where a show can be watched.
+- Shows with a blank `networks` can never match Netflix, so some may be missing.
+- Copies of one show differ in `popularity`, probably from snapshots taken at different times. This is assumed, there is no timestamp column. One popularity reading is noisy, and the median is only used where nothing else differs.
+- Left for EDA: the `popularity` floor at 0, outliers in `episode_run_time`, noisy `vote_average` for shows with few votes, and future start dates (32 rows after June 2024).
+- One known duplicate show under two IDs (The Lørenskog Disappearance) is not removed, because a fix for one ID would not scale.

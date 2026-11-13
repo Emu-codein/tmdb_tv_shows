@@ -2,6 +2,7 @@
 
 import re
 from pathlib import Path
+from urllib.parse import urlparse
 
 import numpy as np
 import pandas as pd
@@ -35,8 +36,16 @@ def split_list(text):
 
 
 def clean_data(raw):
-    """Blank text to NaN, drop exact duplicate rows, episode_run_time 0 to NaN, normalise names,
-    split list columns, parse dates."""
+    """Clean the raw table. Original columns are kept, new ones are added.
+
+    - blank text to NaN, drop exact duplicate rows
+    - episode_run_time 0 to NaN
+    - number_of_seasons and number_of_episodes 0 to NaN unless Planned or In Production
+    - vote_average to NaN where vote_count is 0 and the average is 0
+    - flag votes_inconsistent (0 votes, average above 0), values untouched
+    - name_clean, the _list columns, dates to datetime
+    - flag dates_reversed (last_air_date before first_air_date), values untouched
+    """
     clean = raw.copy()
 
     text_cols = clean.select_dtypes(include=["object", "string"]).columns
@@ -80,12 +89,27 @@ def clean_data(raw):
     return clean
 
 
+def _is_netflix_url(url):
+    """True if the homepage is on netflix.com (www.netflix.com, netflix.com, ...)."""
+    if not isinstance(url, str):
+        return False
+    host = urlparse(url.strip()).hostname or ""
+    return host == "netflix.com" or host.endswith(".netflix.com")
+
+
 def mark_netflix(clean):
-    """Add is_netflix: True if 'netflix' is one of the networks (ignoring case)."""
+    """Mark Netflix shows. `networks` is never changed.
+
+    - netflix_network: 'netflix' is one of the networks (ignoring case)
+    - netflix_homepage: the homepage is on netflix.com
+    - is_netflix: either of the two
+    """
     out = clean.copy()
-    out["is_netflix"] = out.networks_list.apply(
+    out["netflix_network"] = out.networks_list.apply(
         lambda nets: isinstance(nets, list) and "netflix" in [n.lower() for n in nets]
     )
+    out["netflix_homepage"] = out.homepage.apply(_is_netflix_url)
+    out["is_netflix"] = out.netflix_network | out.netflix_homepage
     return out
 
 

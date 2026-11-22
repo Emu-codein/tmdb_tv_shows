@@ -6,3 +6,5 @@ mlruns/
 observation.md
 .DS_Store
 docs/
+.env
+catboost_info/

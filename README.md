@@ -47,7 +47,9 @@ If you edit `clean.py` in a running notebook, restart the kernel or use `%autore
 
 ```
 src/tmdb_tv_shows/clean.py   cleaning pipeline (load, clean, flag Netflix, one row per id)
-notebooks/tmdb.ipynb         exploration and notes
+src/tmdb_tv_shows/deck.py    shared helpers for the deck scripts (streamer set, theme)
+notebooks/eda.ipynb          EDA, data quality and the bridge to the ML plan
+analysis/                    one script per deck slide: numbers and charts (see analysis/README.md)
 data/                        dataset, not tracked
 pyproject.toml, uv.lock      dependencies, pinned
 ```
